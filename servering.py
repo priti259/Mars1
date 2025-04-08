@@ -22,7 +22,6 @@ running = False
 queue_lock = asyncio.Lock()
 robot_manager = RobotManager(config["token"])
 password_waiting = {}  # chat_id: (poi, user_name)
-cancel_waiting = set()
 
 # Location-based Notifications
 ALMOST_THERE_DISTANCE = 5.0
@@ -101,18 +100,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user = query.from_user
     poi = POI_MAP[query.data]
+    chat_id = query.message.chat_id or user.id
 
     async with queue_lock:
         if running:
-            password_waiting[query.message.chat_id] = (poi, user.full_name)
+            password_waiting[chat_id] = (poi, user.full_name)
             await query.message.reply_text("🔒 Robot is busy. Send priority password or type 'cancelall' to clear queue.")
             return
-        task_queue.append({"user": user.full_name, "poi": poi, "chat_id": query.message.chat_id})
+        task_queue.append({"user": user.full_name, "poi": poi, "chat_id": chat_id})
         await query.edit_message_text(f"📦 Task queued. Position: #{len(task_queue)}")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global running, current_task
-    chat_id = update.message.chat_id
+    chat_id = update.effective_chat.id
     msg = update.message.text.strip()
 
     if chat_id in password_waiting:
@@ -120,7 +120,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if msg == PRIORITY_PASSWORD:
             async with queue_lock:
                 task_queue.insert(0, {"user": user, "poi": poi, "chat_id": chat_id})
-            await update.message.reply_text("✅ Task moved to front of queue.")
+            await update.message.reply_text("✅ Task moved to front of queue. ⚠️ Queue order changed.")
         else:
             async with queue_lock:
                 task_queue.append({"user": user, "poi": poi, "chat_id": chat_id})
