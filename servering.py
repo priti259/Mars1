@@ -35,12 +35,20 @@ def reset_notification_flags():
 
 # POI list
 POI_LIST = [
-    {"name": "Cupboard", "coordinate": [-1.12, 1.005], "yaw": 3.71, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "4D Robot", "coordinate": [-3.35, 7.97], "yaw": 0, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "Cafeteria", "coordinate": [20.46, 1.41], "yaw": 0, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "Charging Station", "coordinate": [-4.63, 3.73], "yaw": 355.11, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "Cupboard", "coordinate": [-1.12, 1.01], "yaw": 3.71, "areaId": "67f4a016dd20bc984408fd60"},
     {"name": "Door", "coordinate": [-0.61, 1.66], "yaw": 2.54, "areaId": "67f4a016dd20bc984408fd60"},
-    {"name": "Charging Station", "coordinate": [-4.6316, 3.7321], "yaw": 355.11, "areaId": "67f4a016dd20bc984408fd60"},
-    {"name": "Reception", "coordinate": [19.89, 65.67], "yaw": 355.02, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "Entrance", "coordinate": [20.11, 68.40], "yaw": 86.84, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "Founder cabin", "coordinate": [19.14, 28.95], "yaw": 0, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "Founder lounge", "coordinate": [19.19, 40.19], "yaw": 0, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "HR", "coordinate": [19.64, 57.38], "yaw": 0, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "MB SHUTTLE", "coordinate": [4.78, 30.48], "yaw": 0, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "NPD", "coordinate": [18.08, 11.06], "yaw": 0, "areaId": "67f4a016dd20bc984408fd60"},
     {"name": "Play area", "coordinate": [15.73, 6.77], "yaw": 0, "areaId": "67f4a016dd20bc984408fd60"},
-    {"name": "VR", "coordinate": [18.62, 45.13], "yaw": 0, "areaId": "67f4a016dd20bc984408fd60"}
+    {"name": "Reception", "coordinate": [19.89, 65.67], "yaw": 355.02, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "VR", "coordinate": [18.62, 45.14], "yaw": 0, "areaId": "67f4a016dd20bc984408fd60"},
 ]
 POI_MAP = {poi["name"].lower().replace(" ", "_"): poi for poi in POI_LIST}
 
