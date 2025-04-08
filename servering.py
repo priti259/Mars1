@@ -6,11 +6,9 @@ from telegram.ext import (
 import asyncio
 import nest_asyncio
 import math
-import time
 from AxTask import run_robot_task_to
 from AxRobot import RobotManager
 from config import config
-import requests
 
 TELEGRAM_TOKEN = "8143266327:AAGSoF0-9DeBtCybVaIhGpLsQH6JyjVxmmg"
 PRIORITY_PASSWORD = "robotmaster123"
@@ -112,9 +110,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 task_queue.append({"user": user, "poi": poi, "chat_id": chat_id})
             await update.message.reply_text("❌ Wrong password. Task added to end of queue.")
 
-    elif msg == CANCEL_PASSWORD:
+    elif msg.strip().lower() == CANCEL_PASSWORD:
         async with queue_lock:
             task_queue.clear()
+            global running, current_task
+            running = False
+            current_task = None
         await update.message.reply_text("🧹 All tasks cleared by admin password.")
     else:
         await update.message.reply_text("💡 Use /menu to select a destination.")
