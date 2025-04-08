@@ -34,7 +34,14 @@ def reset_notification_flags():
     notification_sent = {'departed': False, 'almost_there': False, 'arrived': False}
 
 # POI list
-POI_LIST = [...]
+POI_LIST = [
+    {"name": "Cupboard", "coordinate": [-1.12, 1.005], "yaw": 3.71, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "Door", "coordinate": [-0.61, 1.66], "yaw": 2.54, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "Charging Station", "coordinate": [-4.6316, 3.7321], "yaw": 355.11, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "Reception", "coordinate": [19.89, 65.67], "yaw": 355.02, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "Play area", "coordinate": [15.73, 6.77], "yaw": 0, "areaId": "67f4a016dd20bc984408fd60"},
+    {"name": "VR", "coordinate": [18.62, 45.13], "yaw": 0, "areaId": "67f4a016dd20bc984408fd60"}
+]
 POI_MAP = {poi["name"].lower().replace(" ", "_"): poi for poi in POI_LIST}
 
 def robot_is_busy():
@@ -96,6 +103,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"📦 Task queued. Position: #{len(task_queue)}")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global running, current_task
     chat_id = update.message.chat_id
     msg = update.message.text.strip()
 
@@ -113,7 +121,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif msg.strip().lower() == CANCEL_PASSWORD:
         async with queue_lock:
             task_queue.clear()
-            global running, current_task
             running = False
             current_task = None
         await update.message.reply_text("🧹 All tasks cleared by admin password.")
@@ -121,6 +128,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("💡 Use /menu to select a destination.")
 
 async def emergency_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global running, current_task
     if not robot_is_busy() and not running:
         await update.message.reply_text("🤖 Robot not moving.")
         return
@@ -129,7 +137,6 @@ async def emergency_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if success:
         async with queue_lock:
             task_queue.clear()
-            global running, current_task
             running = False
             current_task = None
         await update.message.reply_text("🛑 Emergency stop sent and queue cleared.")
