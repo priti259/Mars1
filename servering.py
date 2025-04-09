@@ -6,6 +6,7 @@ from telegram.ext import (
 import asyncio
 import nest_asyncio
 import math
+import requests
 from AxTask import run_robot_task_to
 from AxRobot import RobotManager
 from config import config
@@ -18,6 +19,7 @@ ROBOT_ID = "89824116043628m"
 # Globals
 task_queue = []
 current_task = None
+last_task_id = None
 running = False
 queue_lock = asyncio.Lock()
 robot_manager = RobotManager(config["token"])
@@ -65,131 +67,26 @@ def robot_reached_destination(target_poi, tolerance=0.5):
         return rx is not None and ry is not None and math.hypot(rx - tx, ry - ty) <= tolerance
     return False
 
-async def check_location_and_notify(poi, chat_id):
-    success, data = robot_manager.getRobotState(ROBOT_ID)
-    if not success:
-        return
+def remove_task(task_id):
+    url = config["URLPrefix"] + "/task/v1.1/removeTask"
+    headers = {
+        "X-Token": config["token"],
+        "Content-Type": "application/json"
+    }
+    payload = {"taskId": task_id}
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=5)
+        if response.status_code == 200:
+            res = response.json()
+            return res.get("status") == 200, res.get("message", "")
+    except Exception as e:
+        print("[Remove Task Error]", e)
+    return False, "Failed to remove task"
 
-    rx, ry = data.get("x"), data.get("y")
-    tx, ty = poi["coordinate"]
-    distance = math.hypot(rx - tx, ry - ty)
-    speed = data.get("speed", 0)
-
-    if speed > 0.1 and not notification_sent['departed']:
-        await app.bot.send_message(chat_id, "🚀 Robot has departed.")
-        notification_sent['departed'] = True
-
-    elif distance <= ALMOST_THERE_DISTANCE and not notification_sent['almost_there']:
-        await app.bot.send_message(chat_id, "🛵 Almost there!")
-        notification_sent['almost_there'] = True
-
-    elif distance <= ARRIVAL_TOLERANCE and speed < 0.1 and not notification_sent['arrived']:
-        await app.bot.send_message(chat_id, f"📍 Arrived at {poi['name']}!")
-        reset_notification_flags()
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Hi! 👋 Use /menu to choose a destination for the robot.")
-
-async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    buttons = [InlineKeyboardButton(poi["name"], callback_data=key) for key, poi in POI_MAP.items()]
-    keyboard = [buttons[i:i + 3] for i in range(0, len(buttons), 3)]
-    await update.message.reply_text("📍 Choose a destination:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user = query.from_user
-    poi = POI_MAP[query.data]
-    chat_id = query.message.chat_id or user.id
-
-    async with queue_lock:
-        if running:
-            password_waiting[chat_id] = (poi, user.full_name)
-            await query.message.reply_text("🔒 Robot is busy. Send priority password or type 'cancelall' to clear queue.")
-            return
-        task_queue.append({"user": user.full_name, "poi": poi, "chat_id": chat_id})
-        await query.edit_message_text(f"📦 Task queued. Position: #{len(task_queue)}")
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global running, current_task
-    chat_id = update.effective_chat.id
-    msg = update.message.text.strip()
-
-    if chat_id in password_waiting:
-        poi, user = password_waiting.pop(chat_id)
-        if msg == PRIORITY_PASSWORD:
-            async with queue_lock:
-                task_queue.insert(0, {"user": user, "poi": poi, "chat_id": chat_id})
-            await update.message.reply_text("✅ Task moved to front of queue. ⚠️ Queue order changed.")
-        else:
-            async with queue_lock:
-                task_queue.append({"user": user, "poi": poi, "chat_id": chat_id})
-            await update.message.reply_text("❌ Wrong password. Task added to end of queue.")
-
-    elif msg.strip().lower() == CANCEL_PASSWORD:
-        async with queue_lock:
-            task_queue.clear()
-            running = False
-            current_task = None
-        await update.message.reply_text("🧹 All tasks cleared by admin password.")
+async def cancel_task_via_api(update: Update):
+    global last_task_id
+    if last_task_id:
+        success, msg = remove_task(last_task_id)
+        await update.message.reply_text("✅ Task removed via API." if success else f"❌ Failed to cancel task: {msg}")
     else:
-        await update.message.reply_text("💡 Use /menu to select a destination.")
-
-async def emergency_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global running, current_task
-    if not robot_is_busy() and not running:
-        await update.message.reply_text("🤖 Robot not moving.")
-        return
-
-    success, _ = robot_manager.emergencyStop(ROBOT_ID)
-    if success:
-        async with queue_lock:
-            task_queue.clear()
-            running = False
-            current_task = None
-        await update.message.reply_text("🛑 Emergency stop sent and queue cleared.")
-    else:
-        await update.message.reply_text("❌ Emergency stop failed.")
-
-async def task_worker():
-    global running, current_task
-    while True:
-        await asyncio.sleep(1)
-        if not running and task_queue and not robot_is_busy():
-            async with queue_lock:
-                current_task = task_queue.pop(0)
-                running = True
-                reset_notification_flags()
-
-            chat_id = current_task["chat_id"]
-            poi = current_task["poi"]
-            success, _ = run_robot_task_to(poi)
-            if not success:
-                await app.bot.send_message(chat_id, f"❌ Failed to start task to {poi['name']}")
-                running = False
-                continue
-
-            while not robot_reached_destination(poi):
-                await check_location_and_notify(poi, chat_id)
-                await asyncio.sleep(2)
-
-            await check_location_and_notify(poi, chat_id)
-            await asyncio.sleep(10)
-            await app.bot.send_message(chat_id, f"✅ Reached {poi['name']}!")
-            running = False
-            current_task = None
-
-async def run_bot():
-    global app
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("menu", show_menu))
-    app.add_handler(CommandHandler("stop", emergency_stop))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    asyncio.create_task(task_worker())
-    await app.run_polling()
-
-if __name__ == "__main__":
-    nest_asyncio.apply()
-    asyncio.run(run_bot())
+        await update.message.reply_text("⚠️ No task ID available to cancel.")
